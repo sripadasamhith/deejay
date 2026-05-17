@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>DeeJay — Blend Any Two Tracks</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #151520;
+            --surface-hover: #1e1e2e;
+            --accent: #7c3aed;
+            --accent-glow: #a78bfa;
+            --text: #e2e8f0;
+            --text-dim: #94a3b8;
+            --track-a: #06b6d4;
+            --track-b: #f43f5e;
+            --blend-zone: #7c3aed;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+
+        .app {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 8px 0;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--track-a), var(--accent-glow), var(--track-b));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* Track Upload Cards */
+        .track-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .track-card.has-track { border-color: var(--accent); }
+        .track-card.track-a.has-track { border-color: var(--track-a); }
+        .track-card.track-b.has-track { border-color: var(--track-b); }
+
+        .track-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+
+        .track-a .track-label { color: var(--track-a); }
+        .track-b .track-label { color: var(--track-b); }
+
+        .upload-zone {
+            border: 2px dashed #333;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-zone:hover, .upload-zone:active {
+            border-color: var(--accent);
+            background: var(--surface-hover);
+        }
+
+        .upload-zone input { display: none; }
+
+        .upload-zone .icon {
+            font-size: 1.8rem;
+            margin-bottom: 6px;
+        }
+
+        .upload-zone .text {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .track-info {
+            display: none;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .has-track .upload-zone { display: none; }
+        .has-track .track-info { display: flex; }
+
+        .track-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .waveform-container {
+            height: 48px;
+            background: #0a0a0f;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .waveform-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .track-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: var(--surface-hover);
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .btn-icon:hover { background: var(--accent); }
+
+        .btn-remove {
+            margin-left: auto;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* Blend Controls */
+        .blend-section {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 20px 16px;
+        }
+
+        .blend-section h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--accent-glow);
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+
+        .control-group:last-child { margin-bottom: 0; }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        .control-value {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #1e1e2e;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        .blend-mode-selector {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .blend-mode-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            background: none;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .blend-mode-btn.active {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Playback */
+        .playback-section {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .transport {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .btn-play {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--accent), var(--track-b));
+            color: white;
+            font-size: 1.4rem;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+            transition: transform 0.1s;
+        }
+
+        .btn-play:active { transform: scale(0.95); }
+        .btn-play:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #1e1e2e;
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--track-a), var(--blend-zone), var(--track-b));
+            transition: width 0.1s linear;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+        }
+
+        /* Blend Timeline Visual */
+        .blend-timeline {
+            height: 32px;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .timeline-a {
+            background: var(--track-a);
+            opacity: 0.6;
+            transition: width 0.3s;
+        }
+
+        .timeline-blend {
+            background: linear-gradient(90deg, var(--track-a), var(--track-b));
+            opacity: 0.8;
+            transition: width 0.3s;
+        }
+
+        .timeline-b {
+            background: var(--track-b);
+            opacity: 0.6;
+            transition: width 0.3s;
+        }
+
+        /* Export */
+        .export-section {
+            text-align: center;
+        }
+
+        .btn-export {
+            padding: 12px 24px;
+            border-radius: 24px;
+            border: 1px solid var(--accent);
+            background: none;
+            color: var(--accent-glow);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-export:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-export:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Status messages */
+        .status {
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            padding: 8px;
+            min-height: 24px;
+        }
+
+        .status.processing {
+            color: var(--accent-glow);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>DeeJay</h1>
+            <p>Blend any two tracks together</p>
+        </header>
+
+        <!-- Track A -->
+        <div class="track-card track-a" id="trackCardA">
+            <div class="track-label">Track A</div>
+            <div class="upload-zone" id="uploadA">
+                <input type="file" accept="audio/*" id="fileA">
+                <div class="icon">🎵</div>
+                <div class="text">Tap to load first track</div>
+            </div>
+            <div class="track-info">
+                <div class="track-name" id="nameA"></div>
+                <div class="track-meta">
+                    <span id="durationA"></span>
+                    <span id="bpmA"></span>
+                </div>
+                <div class="waveform-container">
+                    <canvas id="waveformA"></canvas>
+                </div>
+                <div class="track-actions">
+                    <button class="btn-icon" onclick="previewTrack('A')">▶</button>
+                    <button class="btn-remove" onclick="removeTrack('A')">✕ Remove</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Track B -->
+        <div class="track-card track-b" id="trackCardB">
+            <div class="track-label">Track B</div>
+            <div class="upload-zone" id="uploadB">
+                <input type="file" accept="audio/*" id="fileB">
+                <div class="icon">🎵</div>
+                <div class="text">Tap to load second track</div>
+            </div>
+            <div class="track-info">
+                <div class="track-name" id="nameB"></div>
+                <div class="track-meta">
+                    <span id="durationB"></span>
+                    <span id="bpmB"></span>
+                </div>
+                <div class="waveform-container">
+                    <canvas id="waveformB"></canvas>
+                </div>
+                <div class="track-actions">
+                    <button class="btn-icon" onclick="previewTrack('B')">▶</button>
+                    <button class="btn-remove" onclick="removeTrack('B')">✕ Remove</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blend Controls -->
+        <div class="blend-section">
+            <h2>Blend Settings</h2>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Transition Duration</span>
+                    <span class="control-value" id="durationValue">8s</span>
+                </div>
+                <input type="range" id="transitionDuration" min="2" max="30" value="8" step="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Crossfade Point (% of Track A)</span>
+                    <span class="control-value" id="crossfadePointValue">75%</span>
+                </div>
+                <input type="range" id="crossfadePoint" min="30" max="95" value="75" step="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Blend Mode</span>
+                </div>
+                <div class="blend-mode-selector">
+                    <button class="blend-mode-btn active" data-mode="crossfade">Crossfade</button>
+                    <button class="blend-mode-btn" data-mode="beatmatch">Beat Match</button>
+                    <button class="blend-mode-btn" data-mode="harmonic">Harmonic</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>EQ Blend (Low-pass on A exit)</span>
+                    <span class="control-value" id="eqValue">On</span>
+                </div>
+                <input type="range" id="eqBlend" min="0" max="100" value="70" step="1">
+            </div>
+        </div>
+
+        <!-- Blend Timeline -->
+        <div class="playback-section">
+            <div class="blend-timeline">
+                <div class="timeline-a" id="timelineA" style="width:65%"></div>
+                <div class="timeline-blend" id="timelineBlend" style="width:20%"></div>
+                <div class="timeline-b" id="timelineB" style="width:15%"></div>
+            </div>
+
+            <div class="transport">
+                <button class="btn-play" id="btnPlay" disabled>▶</button>
+            </div>
+
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="time-display">
+                <span id="currentTime">0:00</span>
+                <span id="totalTime">0:00</span>
+            </div>
+        </div>
+
+        <!-- Export -->
+        <div class="export-section">
+            <button class="btn-export" id="btnExport" disabled>Export Blended Track</button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+    // ===== DeejAY Audio Engine =====
+    class BlendEngine {
+        constructor() {
+            this.ctx = null;
+            this.tracks = { A: null, B: null };
+            this.buffers = { A: null, B: null };
+            this.sources = { A: null, B: null };
+            this.gains = { A: null, B: null };
+            this.filters = { A: null, B: null };
+            this.analyser = { A: null, B: null };
+            this.isPlaying = false;
+            this.startTime = 0;
+            this.blendMode = 'crossfade';
+            this.transitionDuration = 8;
+            this.crossfadePoint = 0.75; // percentage of track A where blend starts
+            this.eqBlend = 0.7;
+        }
+
+        async init() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this.ctx.state === 'suspended') {
+                await this.ctx.resume();
+            }
+        }
+
+        async loadTrack(file, trackId) {
+            await this.init();
+            const arrayBuffer = await file.arrayBuffer();
+            const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+            this.buffers[trackId] = audioBuffer;
+            return {
+                duration: audioBuffer.duration,
+                sampleRate: audioBuffer.sampleRate,
+                channels: audioBuffer.numberOfChannels,
+                bpm: this.estimateBPM(audioBuffer)
+            };
+        }
+
+        estimateBPM(buffer) {
+            // Basic onset-detection BPM estimation
+            const data = buffer.getChannelData(0);
+            const sampleRate = buffer.sampleRate;
+            const blockSize = Math.floor(sampleRate * 0.05); // 50ms blocks
+            const blocks = Math.floor(data.length / blockSize);
+            const energy = [];
+
+            for (let i = 0; i < blocks; i++) {
+                let sum = 0;
+                const start = i * blockSize;
+                for (let j = start; j < start + blockSize; j++) {
+                    sum += data[j] * data[j];
+                }
+                energy.push(sum / blockSize);
+            }
+
+            // Find peaks in energy (onsets)
+            let peaks = 0;
+            const threshold = energy.reduce((a, b) => a + b) / energy.length * 1.5;
+            let lastPeak = -10;
+
+            for (let i = 1; i < energy.length - 1; i++) {
+                if (energy[i] > threshold && energy[i] > energy[i-1] && energy[i] > energy[i+1]) {
+                    if (i - lastPeak > 4) { // min distance between peaks
+                        peaks++;
+                        lastPeak = i;
+                    }
+                }
+            }
+
+            const durationSec = data.length / sampleRate;
+            const bpm = Math.round((peaks / durationSec) * 60);
+            // Clamp to reasonable BPM range
+            if (bpm > 60 && bpm < 200) return bpm;
+            if (bpm > 200) return Math.round(bpm / 2);
+            return null;
+        }
+
+        getBlendedDuration() {
+            if (!this.buffers.A || !this.buffers.B) return 0;
+            const aEnd = this.buffers.A.duration * this.crossfadePoint + this.transitionDuration;
+            const bPortion = this.buffers.B.duration;
+            return this.buffers.A.duration * this.crossfadePoint + this.transitionDuration +
+                   Math.max(0, bPortion - this.transitionDuration);
+        }
+
+        play() {
+            if (!this.buffers.A || !this.buffers.B) return;
+            this.stop();
+            this.init();
+
+            const blendStartTime = this.buffers.A.duration * this.crossfadePoint;
+            const totalDuration = this.getBlendedDuration();
+
+            // Source A
+            this.sources.A = this.ctx.createBufferSource();
+            this.sources.A.buffer = this.buffers.A;
+            this.gains.A = this.ctx.createGain();
+            this.filters.A = this.ctx.createBiquadFilter();
+            this.filters.A.type = 'lowpass';
+            this.filters.A.frequency.value = 20000;
+
+            this.sources.A.connect(this.filters.A);
+            this.filters.A.connect(this.gains.A);
+            this.gains.A.connect(this.ctx.destination);
+
+            // Source B
+            this.sources.B = this.ctx.createBufferSource();
+            this.sources.B.buffer = this.buffers.B;
+            this.gains.B = this.ctx.createGain();
+            this.filters.B = this.ctx.createBiquadFilter();
+            this.filters.B.type = 'highpass';
+            this.filters.B.frequency.value = 20;
+
+            this.sources.B.connect(this.filters.B);
+            this.filters.B.connect(this.gains.B);
+            this.gains.B.connect(this.ctx.destination);
+
+            // Schedule gain automation for crossfade
+            const now = this.ctx.currentTime;
+
+            // Track A: full volume, then fade out during transition
+            this.gains.A.gain.setValueAtTime(1, now);
+            this.gains.A.gain.setValueAtTime(1, now + blendStartTime);
+            this.gains.A.gain.exponentialRampToValueAtTime(0.001, now + blendStartTime + this.transitionDuration);
+
+            // Track A: EQ filter sweep during transition (low-pass closes)
+            if (this.eqBlend > 0) {
+                this.filters.A.frequency.setValueAtTime(20000, now);
+                this.filters.A.frequency.setValueAtTime(20000, now + blendStartTime);
+                this.filters.A.frequency.exponentialRampToValueAtTime(
+                    200 + (20000 - 200) * (1 - this.eqBlend),
+                    now + blendStartTime + this.transitionDuration
+                );
+            }
+
+            // Track B: fade in during transition, then full volume
+            this.gains.B.gain.setValueAtTime(0.001, now);
+            this.gains.B.gain.setValueAtTime(0.001, now + blendStartTime);
+            this.gains.B.gain.exponentialRampToValueAtTime(1, now + blendStartTime + this.transitionDuration);
+
+            // Track B: EQ filter opens up during transition
+            if (this.eqBlend > 0) {
+                this.filters.B.frequency.setValueAtTime(800, now);
+                this.filters.B.frequency.setValueAtTime(800, now + blendStartTime);
+                this.filters.B.frequency.exponentialRampToValueAtTime(20, now + blendStartTime + this.transitionDuration);
+            }
+
+            // Start playback
+            this.sources.A.start(now);
+            this.sources.B.start(now + blendStartTime);
+
+            this.isPlaying = true;
+            this.startTime = now;
+            this.totalDuration = totalDuration;
+
+            // Auto-stop
+            this.sources.B.onended = () => {
+                this.isPlaying = false;
+                updateUI();
+            };
+        }
+
+        stop() {
+            if (this.sources.A) { try { this.sources.A.stop(); } catch(e) {} }
+            if (this.sources.B) { try { this.sources.B.stop(); } catch(e) {} }
+            this.isPlaying = false;
+        }
+
+        previewSingle(trackId) {
+            this.init();
+            if (this.sources[trackId]) { try { this.sources[trackId].stop(); } catch(e) {} }
+
+            const src = this.ctx.createBufferSource();
+            src.buffer = this.buffers[trackId];
+            src.connect(this.ctx.destination);
+            src.start();
+            this.sources[trackId] = src;
+
+            // Stop after 10s preview
+            setTimeout(() => { try { src.stop(); } catch(e) {} }, 10000);
+        }
+
+        getProgress() {
+            if (!this.isPlaying || !this.ctx) return 0;
+            const elapsed = this.ctx.currentTime - this.startTime;
+            return Math.min(elapsed / this.totalDuration, 1);
+        }
+
+        getElapsed() {
+            if (!this.isPlaying || !this.ctx) return 0;
+            return this.ctx.currentTime - this.startTime;
+        }
+
+        async exportBlend() {
+            if (!this.buffers.A || !this.buffers.B) return null;
+
+            const offlineCtx = new OfflineAudioContext(
+                2,
+                Math.ceil(this.getBlendedDuration() * this.buffers.A.sampleRate),
+                this.buffers.A.sampleRate
+            );
+
+            const blendStartTime = this.buffers.A.duration * this.crossfadePoint;
+
+            // Source A
+            const srcA = offlineCtx.createBufferSource();
+            srcA.buffer = this.buffers.A;
+            const gainA = offlineCtx.createGain();
+            const filterA = offlineCtx.createBiquadFilter();
+            filterA.type = 'lowpass';
+            filterA.frequency.value = 20000;
+            srcA.connect(filterA);
+            filterA.connect(gainA);
+            gainA.connect(offlineCtx.destination);
+
+            // Source B
+            const srcB = offlineCtx.createBufferSource();
+            srcB.buffer = this.buffers.B;
+            const gainB = offlineCtx.createGain();
+            const filterB = offlineCtx.createBiquadFilter();
+            filterB.type = 'highpass';
+            filterB.frequency.value = 20;
+            srcB.connect(filterB);
+            filterB.connect(gainB);
+            gainB.connect(offlineCtx.destination);
+
+            // Automation
+            gainA.gain.setValueAtTime(1, 0);
+            gainA.gain.setValueAtTime(1, blendStartTime);
+            gainA.gain.exponentialRampToValueAtTime(0.001, blendStartTime + this.transitionDuration);
+
+            if (this.eqBlend > 0) {
+                filterA.frequency.setValueAtTime(20000, 0);
+                filterA.frequency.setValueAtTime(20000, blendStartTime);
+                filterA.frequency.exponentialRampToValueAtTime(
+                    200 + (20000 - 200) * (1 - this.eqBlend),
+                    blendStartTime + this.transitionDuration
+                );
+            }
+
+            gainB.gain.setValueAtTime(0.001, 0);
+            gainB.gain.setValueAtTime(0.001, blendStartTime);
+            gainB.gain.exponentialRampToValueAtTime(1, blendStartTime + this.transitionDuration);
+
+            if (this.eqBlend > 0) {
+                filterB.frequency.setValueAtTime(800, 0);
+                filterB.frequency.setValueAtTime(800, blendStartTime);
+                filterB.frequency.exponentialRampToValueAtTime(20, blendStartTime + this.transitionDuration);
+            }
+
+            srcA.start(0);
+            srcB.start(blendStartTime);
+
+            const renderedBuffer = await offlineCtx.startRendering();
+            return this.bufferToWav(renderedBuffer);
+        }
+
+        bufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const length = buffer.length * numChannels * 2;
+            const arrayBuffer = new ArrayBuffer(44 + length);
+            const view = new DataView(arrayBuffer);
+
+            // WAV header
+            const writeString = (offset, str) => {
+                for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numChannels * 2, true);
+            view.setUint16(32, numChannels * 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length, true);
+
+            let offset = 44;
+            for (let i = 0; i < buffer.length; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+                    view.setInt16(offset, sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
+    }
+
+    // ===== UI Controller =====
+    const engine = new BlendEngine();
+    let animFrame = null;
+
+    // File upload handlers
+    document.getElementById('uploadA').addEventListener('click', () => document.getElementById('fileA').click());
+    document.getElementById('uploadB').addEventListener('click', () => document.getElementById('fileB').click());
+
+    document.getElementById('fileA').addEventListener('change', (e) => handleFile(e, 'A'));
+    document.getElementById('fileB').addEventListener('change', (e) => handleFile(e, 'B'));
+
+    async function handleFile(e, trackId) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setStatus('Loading track...', true);
+        try {
+            const info = await engine.loadTrack(file, trackId);
+
+            document.getElementById(`name${trackId}`).textContent = file.name.replace(/\.[^/.]+$/, '');
+            document.getElementById(`duration${trackId}`).textContent = formatTime(info.duration);
+            document.getElementById(`bpm${trackId}`).textContent = info.bpm ? `~${info.bpm} BPM` : '';
+            document.getElementById(`trackCard${trackId}`).classList.add('has-track');
+
+            drawWaveform(engine.buffers[trackId], `waveform${trackId}`, trackId);
+            updateTimeline();
+            checkReady();
+            setStatus('');
+        } catch (err) {
+            setStatus('Error loading track. Try a different file.');
+            console.error(err);
+        }
+    }
+
+    function removeTrack(trackId) {
+        engine.buffers[trackId] = null;
+        document.getElementById(`trackCard${trackId}`).classList.remove('has-track');
+        document.getElementById(`file${trackId}`).value = '';
+        checkReady();
+    }
+
+    function previewTrack(trackId) {
+        if (!engine.buffers[trackId]) return;
+        engine.previewSingle(trackId);
+    }
+
+    function drawWaveform(buffer, canvasId, trackId) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * dpr;
+        canvas.height = canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+
+        const data = buffer.getChannelData(0);
+        const width = canvas.offsetWidth;
+        const height = canvas.offsetHeight;
+        const step = Math.ceil(data.length / width);
+        const color = trackId === 'A' ? '#06b6d4' : '#f43f5e';
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.7;
+
+        for (let i = 0; i < width; i++) {
+            let min = 1, max = -1;
+            for (let j = 0; j < step; j++) {
+                const val = data[i * step + j] || 0;
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+            const barHeight = (max - min) * height * 0.8;
+            const y = (height - barHeight) / 2;
+            ctx.fillRect(i, y, 1, barHeight);
+        }
+    }
+
+    // Controls
+    document.getElementById('transitionDuration').addEventListener('input', (e) => {
+        engine.transitionDuration = parseInt(e.target.value);
+        document.getElementById('durationValue').textContent = `${e.target.value}s`;
+        updateTimeline();
+    });
+
+    document.getElementById('crossfadePoint').addEventListener('input', (e) => {
+        engine.crossfadePoint = parseInt(e.target.value) / 100;
+        document.getElementById('crossfadePointValue').textContent = `${e.target.value}%`;
+        updateTimeline();
+    });
+
+    document.getElementById('eqBlend').addEventListener('input', (e) => {
+        engine.eqBlend = parseInt(e.target.value) / 100;
+        document.getElementById('eqValue').textContent = e.target.value > 0 ? 'On' : 'Off';
+    });
+
+    document.querySelectorAll('.blend-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.blend-mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            engine.blendMode = btn.dataset.mode;
+
+            if (btn.dataset.mode !== 'crossfade') {
+                setStatus(`${btn.textContent} mode coming soon — using crossfade for now`);
+                setTimeout(() => setStatus(''), 3000);
+            }
+        });
+    });
+
+    // Playback
+    document.getElementById('btnPlay').addEventListener('click', () => {
+        if (engine.isPlaying) {
+            engine.stop();
+            updateUI();
+        } else {
+            engine.play();
+            updateUI();
+            startProgressLoop();
+        }
+    });
+
+    function startProgressLoop() {
+        if (animFrame) cancelAnimationFrame(animFrame);
+
+        function tick() {
+            if (!engine.isPlaying) {
+                updateUI();
+                return;
+            }
+            const progress = engine.getProgress();
+            document.getElementById('progressFill').style.width = `${progress * 100}%`;
+            document.getElementById('currentTime').textContent = formatTime(engine.getElapsed());
+            animFrame = requestAnimationFrame(tick);
+        }
+        tick();
+    }
+
+    // Export
+    document.getElementById('btnExport').addEventListener('click', async () => {
+        setStatus('Rendering blend...', true);
+        try {
+            const blob = await engine.exportBlend();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `blend_${Date.now()}.wav`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setStatus('Exported!');
+            setTimeout(() => setStatus(''), 2000);
+        } catch (err) {
+            setStatus('Export failed. Try again.');
+            console.error(err);
+        }
+    });
+
+    // Helpers
+    function updateUI() {
+        const btn = document.getElementById('btnPlay');
+        btn.textContent = engine.isPlaying ? '⏸' : '▶';
+        if (!engine.isPlaying) {
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('currentTime').textContent = '0:00';
+        }
+    }
+
+    function checkReady() {
+        const ready = engine.buffers.A && engine.buffers.B;
+        document.getElementById('btnPlay').disabled = !ready;
+        document.getElementById('btnExport').disabled = !ready;
+        if (ready) {
+            document.getElementById('totalTime').textContent = formatTime(engine.getBlendedDuration());
+        }
+    }
+
+    function updateTimeline() {
+        if (!engine.buffers.A || !engine.buffers.B) return;
+        const total = engine.getBlendedDuration();
+        const blendStart = engine.buffers.A.duration * engine.crossfadePoint;
+        const blendEnd = blendStart + engine.transitionDuration;
+
+        const aPct = (blendStart / total) * 100;
+        const blendPct = (engine.transitionDuration / total) * 100;
+        const bPct = 100 - aPct - blendPct;
+
+        document.getElementById('timelineA').style.width = `${aPct}%`;
+        document.getElementById('timelineBlend').style.width = `${blendPct}%`;
+        document.getElementById('timelineB').style.width = `${Math.max(0, bPct)}%`;
+        document.getElementById('totalTime').textContent = formatTime(total);
+    }
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function setStatus(msg, processing = false) {
+        const el = document.getElementById('status');
+        el.textContent = msg;
+        el.className = 'status' + (processing ? ' processing' : '');
+    }
+    </script>
+</body>
+</html>

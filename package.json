@@ -1,0 +1,11 @@
+{
+  "name": "dee-jay",
+  "version": "0.1.0",
+  "description": "Blend any two tracks together — crossfade, beat-match, and harmonic mixing",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": ["dj", "audio", "crossfade", "mix", "blend", "web-audio"],
+  "license": "MIT"
+}
